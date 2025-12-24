@@ -1,11 +1,11 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "sample-quarto-bridge ",
+	"name": "Quarto Bridge",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
-	"isDesktopOnly": false
+	"description": "A bridge between Obsidian and Quarto output.",
+	"author": "Trey Saddler",
+	"authorUrl": "https://treysaddler.com",
+	"fundingUrl": "https://treysaddler.com/buymeacoffee",
+	"isDesktopOnly": true
 }
