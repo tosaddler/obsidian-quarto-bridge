@@ -20,24 +20,26 @@ This document outlines the manual testing procedures to verify the functionality
 ## 2. Core Functionality Tests
 
 ### 2.1 Project Detection
+
 - [ ] **Scenario**: Open `QuartoProject/index.qmd` and run "Preview Project".
-    - **Expected**: Plugin detects `_quarto.yml` in the parent folder and starts the preview.
+  - **Expected**: Plugin detects `_quarto.yml` in the parent folder and starts the preview.
 - [ ] **Scenario**: Open `QuartoProject/chapter1.qmd` (nested file) and run "Preview Project".
-    - **Expected**: Plugin recursively finds `_quarto.yml` in the parent folder.
+  - **Expected**: Plugin recursively finds `_quarto.yml` in the parent folder.
 - [ ] **Scenario**: Open `NonProject/note.md` and run "Preview Project".
-    - **Expected**: Plugin shows a Notice: "No _quarto.yml found...".
+  - **Expected**: Plugin shows a Notice: "No _quarto.yml found...".
 
 ### 2.2 Preview Orchestration
 - [ ] **Scenario**: Start Preview for `QuartoProject`.
-    - **Expected**: 
-        - Notice "Starting Quarto preview..." appears.
-        - A new pane opens with the title "Quarto Preview".
-        - The content of `index.qmd` (rendered HTML) is visible in the iframe.
-        - Notice "Quarto Preview Ready!" appears once the server is listening.
+  - **Expected**: 
+    - Notice "Starting Quarto preview..." appears.
+    - A new pane opens with the title "Quarto Preview".
+    - The content of `index.qmd` (rendered HTML) is visible in the iframe.
+      - Notice "Quarto Preview Ready!" appears once the server is listening.
 - [ ] **Scenario**: Edit `index.qmd` and save.
-    - **Expected**: The preview pane auto-refreshes (handled by Quarto's internal watcher/socket, verified if iframe allows it). *Note: Quarto's default socket might need `allow-same-origin`.*
+  - **Expected**: The preview pane auto-refreshes (handled by Quarto's internal watcher/socket, verified if iframe allows it). *Note: Quarto's default socket might need `allow-same-origin`.*
 
 ### 2.3 Process Management
+
 - [ ] **Scenario**: Run "Stop Preview Server".
     - **Expected**: Notice "Stopped all Quarto preview servers." appears. The preview pane might stop updating or show a connection error if refreshed.
 - [ ] **Scenario**: Start Preview, then close Obsidian completely.
@@ -50,6 +52,18 @@ This document outlines the manual testing procedures to verify the functionality
     - **Expected**: Running "Preview Project" shows an error notice (e.g., "spawn /bin/fakequarto ENOENT").
 - [ ] **Scenario**: Change "Quarto Binary Path" to a valid absolute path (e.g., `/usr/local/bin/quarto`).
     - **Expected**: Preview starts successfully.
+
+### 2.5 Rendering
+- [ ] **Scenario**: Open `QuartoProject/index.qmd` and run "Render Active File".
+    - **Expected**: Notice "Rendering index.qmd..." appears, followed by "Quarto Render Complete!". Output files (e.g., `index.html`) are updated on disk.
+- [ ] **Scenario**: Run "Render Project".
+    - **Expected**: Notice "Rendering project..." appears, followed by "Quarto Render Complete!". The entire site is rebuilt.
+
+### 2.6 Project Creation
+- [ ] **Scenario**: Run "Create New Project".
+    - **Expected**: Modal opens.
+- [ ] **Scenario**: Create a "Website" project named "MySite".
+    - **Expected**: A new folder "MySite" appears in the vault containing `_quarto.yml` and `index.qmd`.
 
 ## 3. Edge Cases & Error Handling
 

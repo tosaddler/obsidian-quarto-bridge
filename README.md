@@ -33,6 +33,27 @@ To save system resources or restart a stuck process:
 1.  Open the Command Palette.
 2.  Run **"Quarto Bridge: Stop Preview Server"**.
 
+### Rendering
+
+You can render your project or individual files to their final output format (HTML, PDF, etc.) without starting a preview server.
+
+1.  **Render Active File**: Renders the currently open file.
+2.  **Render Project**: Renders the entire project (based on `_quarto.yml` location).
+
+Output files will be generated in the same directory or the configured output directory (e.g., `_site`).
+
+### Creating a Project
+
+You can create a new Quarto project directly from Obsidian.
+
+1.  Open the Command Palette.
+2.  Run **"Quarto Bridge: Create New Project"**.
+3.  Fill in the details:
+    -   **Project Type**: Website, Blog, Book, etc.
+    -   **Project Name**: The name of the folder to create.
+    -   **Engine**: Markdown, Jupyter, or Knitr.
+4.  Click **Create**. The plugin will generate the project structure in the current folder.
+
 ## Settings
 
 Go to **Settings > Quarto Bridge** to configure:

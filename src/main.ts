@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, QuartoPluginSettings, QuartoSettingTab } from "./sett
 import { QuartoRunner } from './quarto-runner';
 import { QuartoPreviewView, VIEW_TYPE_QUARTO_PREVIEW } from './views/quarto-preview-view';
 import { findQuartoProjectRoot } from './utils/project-detector';
+import { CreateProjectModal } from './modals/create-project-modal';
 
 export default class QuartoBridgePlugin extends Plugin {
 	settings: QuartoPluginSettings;
@@ -45,6 +46,49 @@ export default class QuartoBridgePlugin extends Plugin {
 			}
 		});
 
+		// Command: Render Active File
+		this.addCommand({
+			id: 'quarto-render-file',
+			name: 'Render Active File',
+			checkCallback: (checking: boolean) => {
+				const activeFile = this.app.workspace.getActiveFile();
+				if (activeFile) {
+					if (!checking) {
+						this.renderFile(activeFile);
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
+		// Command: Render Project
+		this.addCommand({
+			id: 'quarto-render-project',
+			name: 'Render Project',
+			checkCallback: (checking: boolean) => {
+				const activeFile = this.app.workspace.getActiveFile();
+				if (activeFile) {
+					if (!checking) {
+						this.renderProject(activeFile);
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
+		// Command: Create Quarto Project
+		this.addCommand({
+			id: 'quarto-create-project',
+			name: 'Create New Project',
+			callback: () => {
+				new CreateProjectModal(this.app, (result) => {
+					this.createProject(result);
+				}).open();
+			}
+		});
+
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new QuartoSettingTab(this.app, this));
 	}
@@ -61,6 +105,15 @@ export default class QuartoBridgePlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+    getAbsolutePath(relativePath: string): string {
+        // @ts-ignore - adapter.getBasePath is internal API but widely used.
+        const adapter = this.app.vault.adapter as any;
+        const vaultRoot = adapter.getBasePath();
+        // Handle root path case where relativePath is empty or '/'
+        if (!relativePath || relativePath === '/') return vaultRoot;
+        return `${vaultRoot}/${relativePath}`;
+    }
+
 	async previewProject(file: TFile) {
 		const projectRoot = findQuartoProjectRoot(this.app, file);
 		
@@ -69,18 +122,38 @@ export default class QuartoBridgePlugin extends Plugin {
 			return;
 		}
 
-		// Get absolute path for the runner
-		// @ts-ignore - adapter.getBasePath is internal API but widely used. 
-		// Alternative: app.vault.adapter.getResourcePath(projectRoot.path) returns a file:// URL which is harder to parse.
-		// For desktop, getBasePath() is reliable.
-		const adapter = this.app.vault.adapter as any;
-		const vaultRoot = adapter.getBasePath();
-		const projectPath = `${vaultRoot}/${projectRoot.path}`;
+		const projectPath = this.getAbsolutePath(projectRoot.path);
 
 		this.quartoRunner.startPreview(projectPath, async (url) => {
 			await this.activateView(url);
 		}, this.settings.quartoBinary);
 	}
+
+    async renderFile(file: TFile) {
+        const parentPath = file.parent ? file.parent.path : '';
+        const workingDir = this.getAbsolutePath(parentPath);
+        await this.quartoRunner.render(workingDir, file.name, this.settings.quartoBinary);
+    }
+
+    async renderProject(file: TFile) {
+        const projectRoot = findQuartoProjectRoot(this.app, file);
+        if (!projectRoot) {
+            new Notice("No _quarto.yml found. Cannot render project.");
+            return;
+        }
+        const workingDir = this.getAbsolutePath(projectRoot.path);
+        await this.quartoRunner.render(workingDir, '.', this.settings.quartoBinary);
+    }
+
+    async createProject(result: { type: string; name: string; engine: string }) {
+        const activeFile = this.app.workspace.getActiveFile();
+        // If active file is in a folder, use that. If root, use root.
+        // If no active file, use root.
+        const parentPath = activeFile && activeFile.parent ? activeFile.parent.path : '/';
+        const absoluteParentPath = this.getAbsolutePath(parentPath);
+
+        await this.quartoRunner.createProject(absoluteParentPath, result.name, result.type, result.engine, this.settings.quartoBinary);
+    }
 
 	async activateView(url: string) {
 		const { workspace } = this.app;

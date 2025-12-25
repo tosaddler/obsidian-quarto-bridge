@@ -83,4 +83,91 @@ export class QuartoRunner {
         }
         this.activeProcesses.clear();
     }
+
+    /**
+     * Renders a specific file or the entire project.
+     * @param workingDir Absolute path to the working directory (project root or file parent)
+     * @param target Relative path to the file to render, or '.' for the whole project
+     * @param quartoBinary Path to the quarto executable
+     */
+    async render(workingDir: string, target: string, quartoBinary: string = 'quarto'): Promise<void> {
+        return new Promise((resolve, reject) => {
+            new Notice(`Rendering ${target === '.' ? 'project' : target}...`);
+
+            const quarto = spawn(quartoBinary, ['render', target], {
+                cwd: workingDir,
+                shell: true,
+                env: process.env
+            });
+
+            quarto.stdout?.on('data', (data) => {
+                console.log(`[Quarto Render]: ${data}`);
+            });
+
+            quarto.stderr?.on('data', (data) => {
+                console.log(`[Quarto Render Err]: ${data}`);
+            });
+
+            quarto.on('close', (code) => {
+                if (code === 0) {
+                    new Notice('Quarto Render Complete!');
+                    resolve();
+                } else {
+                    new Notice(`Quarto Render failed with code ${code}`);
+                    reject(new Error(`Exited with code ${code}`));
+                }
+            });
+
+            quarto.on('error', (err) => {
+                new Notice(`Quarto Render error: ${err.message}`);
+                reject(err);
+            });
+        });
+    }
+
+    /**
+     * Creates a new Quarto project.
+     * @param parentDir Absolute path to the parent directory where the project folder will be created
+     * @param name Name of the project folder
+     * @param type Type of project (default, website, blog, book, manuscript)
+     * @param engine Computation engine (markdown, jupyter, knitr)
+     * @param quartoBinary Path to the quarto executable
+     */
+    async createProject(parentDir: string, name: string, type: string, engine: string, quartoBinary: string = 'quarto'): Promise<void> {
+        return new Promise((resolve, reject) => {
+            new Notice(`Creating Quarto project: ${name}...`);
+
+            // quarto create project <type> <name> --engine <engine> --no-open
+            const args = ['create', 'project', type, name, '--engine', engine, '--no-open'];
+
+            const quarto = spawn(quartoBinary, args, {
+                cwd: parentDir,
+                shell: true,
+                env: process.env
+            });
+
+            quarto.stdout?.on('data', (data) => {
+                console.log(`[Quarto Create]: ${data}`);
+            });
+
+            quarto.stderr?.on('data', (data) => {
+                console.log(`[Quarto Create Err]: ${data}`);
+            });
+
+            quarto.on('close', (code) => {
+                if (code === 0) {
+                    new Notice('Quarto Project Created!');
+                    resolve();
+                } else {
+                    new Notice(`Quarto Create failed with code ${code}`);
+                    reject(new Error(`Exited with code ${code}`));
+                }
+            });
+
+            quarto.on('error', (err) => {
+                new Notice(`Quarto Create error: ${err.message}`);
+                reject(err);
+            });
+        });
+    }
 }
