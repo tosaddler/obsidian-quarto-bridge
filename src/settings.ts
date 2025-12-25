@@ -1,18 +1,18 @@
-import {App, PluginSettingTab, Setting} from "obsidian";
-import MyPlugin from "./main";
+import { App, PluginSettingTab, Setting } from "obsidian";
+import QuartoBridgePlugin from "./main";
 
-export interface MyPluginSettings {
-	mySetting: string;
+export interface QuartoPluginSettings {
+	quartoBinary: string;
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+export const DEFAULT_SETTINGS: QuartoPluginSettings = {
+	quartoBinary: 'quarto'
 }
 
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+export class QuartoSettingTab extends PluginSettingTab {
+	plugin: QuartoBridgePlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: QuartoBridgePlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -23,13 +23,13 @@ export class SampleSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc('It\'s a secret')
+			.setName('Quarto binary path')
+			.setDesc('Path to the quarto executable. Leave as "quarto" if it is in your system PATH.')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder('Quarto')
+				.setValue(this.plugin.settings.quartoBinary)
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.quartoBinary = value;
 					await this.plugin.saveSettings();
 				}));
 	}

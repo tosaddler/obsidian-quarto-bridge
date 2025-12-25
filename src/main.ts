@@ -1,99 +1,115 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, TFile, WorkspaceLeaf } from 'obsidian';
+import { DEFAULT_SETTINGS, QuartoPluginSettings, QuartoSettingTab } from "./settings";
+import { QuartoRunner } from './quarto-runner';
+import { QuartoPreviewView, VIEW_TYPE_QUARTO_PREVIEW } from './views/quarto-preview-view';
+import { findQuartoProjectRoot } from './utils/project-detector';
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class QuartoBridgePlugin extends Plugin {
+	settings: QuartoPluginSettings;
+	quartoRunner: QuartoRunner;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
+		this.quartoRunner = new QuartoRunner();
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
+		// Register the custom view
+		this.registerView(
+			VIEW_TYPE_QUARTO_PREVIEW,
+			(leaf) => new QuartoPreviewView(leaf)
+		);
 
-		// This adds a simple command that can be triggered anywhere
+		// Command: Preview Quarto Project
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
+			id: 'quarto-preview-project',
+			name: 'Preview Project',
 			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
+				const activeFile = this.app.workspace.getActiveFile();
+				if (activeFile) {
 					if (!checking) {
-						new SampleModal(this.app).open();
+						this.previewProject(activeFile);
 					}
-
-					// This command will only show up in Command Palette when the check function returns true
 					return true;
 				}
 				return false;
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
+		// Command: Stop Quarto Preview
+		this.addCommand({
+			id: 'quarto-stop-preview',
+			name: 'Stop Preview Server',
+			callback: () => {
+				this.quartoRunner.stopAll();
+				new Notice("Stopped all Quarto preview servers.");
+			}
 		});
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		// This adds a settings tab so the user can configure various aspects of the plugin
+		this.addSettingTab(new QuartoSettingTab(this.app, this));
 	}
 
 	onunload() {
+		this.quartoRunner.stopAll();
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<QuartoPluginSettings>);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-}
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
+	async previewProject(file: TFile) {
+		const projectRoot = findQuartoProjectRoot(this.app, file);
+		
+		if (!projectRoot) {
+			new Notice("No _quarto.yml found in parent directories. Is this a Quarto project?");
+			return;
+		}
+
+		// Get absolute path for the runner
+		// @ts-ignore - adapter.getBasePath is internal API but widely used. 
+		// Alternative: app.vault.adapter.getResourcePath(projectRoot.path) returns a file:// URL which is harder to parse.
+		// For desktop, getBasePath() is reliable.
+		const adapter = this.app.vault.adapter as any;
+		const vaultRoot = adapter.getBasePath();
+		const projectPath = `${vaultRoot}/${projectRoot.path}`;
+
+		this.quartoRunner.startPreview(projectPath, async (url) => {
+			await this.activateView(url);
+		}, this.settings.quartoBinary);
 	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+	async activateView(url: string) {
+		const { workspace } = this.app;
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+		let leaf: WorkspaceLeaf | null = null;
+		const leaves = workspace.getLeavesOfType(VIEW_TYPE_QUARTO_PREVIEW);
+
+		if (leaves.length > 0) {
+			// A leaf with our view already exists, use that
+			leaf = leaves[0] ?? null;
+		} else {
+			// Our view could not be found in the workspace, create a new leaf
+			// in the right sidebar for now, or split the active leaf
+			leaf = workspace.getRightLeaf(false);
+			if (!leaf) {
+                 // Fallback if right leaf isn't available
+                 leaf = workspace.getLeaf(true);
+            }
+			await leaf.setViewState({ type: VIEW_TYPE_QUARTO_PREVIEW, active: true });
+		}
+
+        if (leaf) {
+            // "Reveal" the leaf in case it is in a collapsed sidebar
+            workspace.revealLeaf(leaf);
+
+            // Update the view with the URL
+            if (leaf.view instanceof QuartoPreviewView) {
+                leaf.view.setUrl(url);
+            }
+        }
 	}
 }
